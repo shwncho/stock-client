@@ -5,21 +5,26 @@ const API_BASE_URL = 'http://localhost:8080/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 300000,
+  timeout: 5000,
 });
 
 export const analysisAPI = {
   /**
    * 분석 실행
    */
-  runAnalysis: async (): Promise<LLMAnalysisResult[]> => {
-    try {
-      const response = await apiClient.post('/analysis/run');
-      return response.data;
-    } catch (error) {
-      console.error('분석 실행 실패:', error);
-      throw error;
-    }
+  startAnalysis: async (): Promise<{ analysisId: string }> => {
+    const res = await apiClient.post('/analysis/run');
+    return res.data;
+  },
+
+  getStatus: async (analysisId: string) => {
+    const res = await apiClient.get(`/analysis/status/${analysisId}`);
+    return res.data.status;
+  },
+
+  getResult: async (analysisId: string): Promise<LLMAnalysisResult[]> => {
+    const res = await apiClient.get(`/analysis/result/${analysisId}`);
+    return res.data;
   },
 
   /**

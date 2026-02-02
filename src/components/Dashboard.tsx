@@ -13,10 +13,36 @@ export const Dashboard: React.FC = () => {
   const [selectedAnalysis, setSelectedAnalysis] = useState<LLMAnalysisResult | null>(null);
   const [dailyPrices, setDailyPrices] = useState<DailyPrice[]>([]);
 
-  // 초기 로드
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [status, setStatus] = useState<'IDLE' | 'RUNNING' | 'DONE' | 'FAILED'>('IDLE');
+
+  //초기 로드
   useEffect(() => {
     loadLatestAnalysis();
   }, []);
+
+  useEffect(() => {
+    if (!analysisId || status !== 'RUNNING') return;
+
+    const interval = setInterval(async () => {
+      const jobStatus = await analysisAPI.getStatus(analysisId);
+      console.log('jobStatus raw =', jobStatus, typeof jobStatus);
+
+      if (jobStatus === 'DONE') {
+        const results = await analysisAPI.getResult(analysisId);
+        setAnalyses(results);
+        setStatus('DONE');
+        clearInterval(interval);
+      }
+
+      if (jobStatus === 'FAILED') {
+        setStatus('FAILED');
+        clearInterval(interval);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [analysisId, status]);
 
   const loadLatestAnalysis = async () => {
     try {
@@ -31,17 +57,16 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleRunAnalysis = async () => {
-    try {
-      setLoading(true);
-      const results = await analysisAPI.runAnalysis();
-      setAnalyses(results);
-    } catch (error) {
-      console.error('분석 실행 실패:', error);
-      alert('분석 실행에 실패했습니다. 콘솔을 확인해주세요.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setStatus('RUNNING');
+
+    const { analysisId } = await analysisAPI.startAnalysis();
+    setAnalysisId(analysisId);
+
+  } catch (e) {
+    setStatus('FAILED');
+  }
+};
 
   const handleExpandCard = (analysis: LLMAnalysisResult) => {
     setSelectedAnalysis(analysis);
@@ -75,8 +100,8 @@ export const Dashboard: React.FC = () => {
     link.click();
   };
 
-  if (loading && analyses.length === 0) {
-    return <LoadingSpinner />;
+  if (status === 'RUNNING') {
+    return <LoadingSpinner message="분석 작업을 실행 중입니다..." />;
   }
 
   return (
