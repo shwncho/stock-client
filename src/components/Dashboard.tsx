@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { AnalysisHeader } from './AnalysisHeader';
 import { StockCard } from './StockCard';
 import { ChartComponent } from './ChartComponent';
@@ -114,14 +115,8 @@ export const Dashboard: React.FC = () => {
   const handleExpandCard = (analysis: LLMAnalysisResult) => {
     console.log('🔍 Expanding card for:', analysis.stockCode);
     setSelectedAnalysis(analysis);
-    // dailyPricesJson 파싱
-    try {
-      const prices = JSON.parse(analysis.llmAnalysis || '[]');
-      console.log('📈 Chart data parsed:', prices.length, 'items');
-      setDailyPrices(prices);
-    } catch (e) {
-      console.warn('⚠️ 차트 데이터 없음:', e);
-    }
+    // 차트 데이터는 현재 API에서 제공하지 않으므로 비워둠
+    setDailyPrices([]);
   };
 
   const handleDownloadReport = () => {
@@ -263,8 +258,25 @@ export const Dashboard: React.FC = () => {
                       <h3 className="text-2xl font-bold mb-4 text-gray-800">
                         상세 분석
                       </h3>
-                      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 whitespace-pre-wrap text-gray-700 leading-relaxed">
-                        {selectedAnalysis.llmAnalysis}
+                      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 text-gray-700 leading-relaxed prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({children}) => <h1 className="text-xl font-bold text-gray-900 mb-3">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-lg font-semibold text-gray-800 mb-2">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-base font-medium text-gray-700 mb-2">{children}</h3>,
+                            p: ({children}) => <p className="mb-3 text-gray-600">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
+                            li: ({children}) => <li className="text-gray-600">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold text-gray-800">{children}</strong>,
+                            em: ({children}) => <em className="italic text-gray-600">{children}</em>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-blue-300 pl-4 py-2 mb-3 bg-blue-50 text-gray-700">{children}</blockquote>,
+                            code: ({children}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm text-red-600">{children}</code>,
+                            hr: () => <hr className="my-4 border-gray-300" />
+                          }}
+                        >
+                          {selectedAnalysis.llmAnalysis}
+                        </ReactMarkdown>
                       </div>
                     </div>
 

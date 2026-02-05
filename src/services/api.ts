@@ -47,4 +47,6 @@ export const analysisAPI = {
       throw error;
     }
   },
+
+
 };
