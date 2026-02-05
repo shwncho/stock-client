@@ -16,66 +16,111 @@ export const Dashboard: React.FC = () => {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [status, setStatus] = useState<'IDLE' | 'RUNNING' | 'DONE' | 'FAILED'>('IDLE');
 
+  // 상태 변화 추적
+  useEffect(() => {
+    console.log('🔄 State changed:', {
+      status,
+      analysisId,
+      analysesCount: analyses.length,
+      loading,
+      hasSelectedAnalysis: !!selectedAnalysis
+    });
+  }, [status, analysisId, analyses.length, loading, selectedAnalysis]);
+
   //초기 로드
   useEffect(() => {
     loadLatestAnalysis();
   }, []);
 
   useEffect(() => {
-    if (!analysisId || status !== 'RUNNING') return;
+    if (!analysisId || status !== 'RUNNING') {
+      console.log('📊 Polling stopped:', { analysisId, status });
+      return;
+    }
 
+    console.log('🔄 Starting polling for analysis:', analysisId);
+    
     const interval = setInterval(async () => {
-      const jobStatus = await analysisAPI.getStatus(analysisId);
-      console.log('jobStatus raw =', jobStatus, typeof jobStatus);
+      try {
+        console.log('🔍 Checking status...');
+        const jobStatus = await analysisAPI.getStatus(analysisId);
+        console.log('📡 Server response:', jobStatus);
 
-      if (jobStatus === 'DONE') {
-        const results = await analysisAPI.getResult(analysisId);
-        setAnalyses(results);
-        setStatus('DONE');
-        clearInterval(interval);
-      }
+        if (jobStatus === 'DONE') {
+          console.log('✅ Analysis completed');
+          const results = await analysisAPI.getResult(analysisId);
+          setAnalyses(results);
+          setStatus('DONE');
+          clearInterval(interval);
+          return;
+        }
 
-      if (jobStatus === 'FAILED') {
+        if (jobStatus === 'FAILED') {
+          console.log('❌ Analysis failed');
+          setStatus('FAILED');
+          clearInterval(interval);
+          return;
+        }
+
+        // 예상치 못한 상태 값 처리
+        if (jobStatus !== 'RUNNING') {
+          console.warn('⚠️ Unexpected status:', jobStatus);
+          setStatus('FAILED');
+          clearInterval(interval);
+        }
+      } catch (error) {
+        console.error('🚨 Error during polling:', error);
         setStatus('FAILED');
         clearInterval(interval);
       }
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log('🛑 Cleaning up polling interval');
+      clearInterval(interval);
+    };
   }, [analysisId, status]);
 
   const loadLatestAnalysis = async () => {
     try {
       setLoading(true);
+      console.log('📥 Loading latest analysis...');
       const results = await analysisAPI.getLatestAnalysis();
+      console.log('📊 Latest analysis loaded:', results.length, 'items');
       setAnalyses(results);
     } catch (error) {
-      console.error('분석 결과 로드 실패:', error);
+      console.error('🚨 분석 결과 로드 실패:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRunAnalysis = async () => {
-  try {
-    setStatus('RUNNING');
+    try {
+      console.log('🚀 Starting analysis...');
+      setStatus('RUNNING');
+      setLoading(false); // 중복 호출 방지
 
-    const { analysisId } = await analysisAPI.startAnalysis();
-    setAnalysisId(analysisId);
-
-  } catch (e) {
-    setStatus('FAILED');
-  }
-};
+      const { analysisId } = await analysisAPI.startAnalysis();
+      console.log('📋 Analysis started with ID:', analysisId);
+      setAnalysisId(analysisId);
+    } catch (error) {
+      console.error('🚨 Failed to start analysis:', error);
+      setStatus('FAILED');
+      setLoading(false);
+    }
+  };
 
   const handleExpandCard = (analysis: LLMAnalysisResult) => {
+    console.log('🔍 Expanding card for:', analysis.stockCode);
     setSelectedAnalysis(analysis);
     // dailyPricesJson 파싱
     try {
       const prices = JSON.parse(analysis.llmAnalysis || '[]');
+      console.log('📈 Chart data parsed:', prices.length, 'items');
       setDailyPrices(prices);
     } catch (e) {
-      console.log('차트 데이터 없음');
+      console.warn('⚠️ 차트 데이터 없음:', e);
     }
   };
 
@@ -101,7 +146,40 @@ export const Dashboard: React.FC = () => {
   };
 
   if (status === 'RUNNING') {
+    console.log('⏳ Rendering loading spinner, status:', status);
     return <LoadingSpinner message="분석 작업을 실행 중입니다..." />;
+  }
+
+  if (status === 'FAILED') {
+    console.log('❌ Rendering error state');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
+            <h2 className="text-2xl font-bold text-red-800 mb-4">
+              🚨 분석 작업에 실패했습니다
+            </h2>
+            <p className="text-red-600 mb-6">
+              서버 응답이 없거나 에러가 발생했습니다. 브라우저 개발자 도구(F12)의 콘솔을 확인해보세요.
+            </p>
+            <div className="space-x-4">
+              <button
+                onClick={() => setStatus('IDLE')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              >
+                🔄 다시 시도
+              </button>
+              <button
+                onClick={loadLatestAnalysis}
+                className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              >
+                📊 기존 결과 보기
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
