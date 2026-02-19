@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download } from 'lucide-react';
+import { X, Download, CheckCircle, AlertCircle, Hourglass } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { AnalysisHeader } from './AnalysisHeader';
 import { StockCard } from './StockCard';
@@ -8,6 +8,13 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { analysisAPI } from '../services/api';
 import type { LLMAnalysisResult, DailyPrice } from '../types';
 
+type AnalysisStatus = 'IDLE' | 'RUNNING' | 'DONE' | 'FAILED';
+
+interface ToastMessage {
+  type: 'success' | 'error' | 'info';
+  message: string;
+}
+
 export const Dashboard: React.FC = () => {
   const [analyses, setAnalyses] = useState<LLMAnalysisResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -15,7 +22,8 @@ export const Dashboard: React.FC = () => {
   const [dailyPrices, setDailyPrices] = useState<DailyPrice[]>([]);
 
   const [analysisId, setAnalysisId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'IDLE' | 'RUNNING' | 'DONE' | 'FAILED'>('IDLE');
+  const [status, setStatus] = useState<AnalysisStatus>('IDLE');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // 상태 변화 추적
   useEffect(() => {
@@ -52,6 +60,10 @@ export const Dashboard: React.FC = () => {
           const results = await analysisAPI.getResult(analysisId);
           setAnalyses(results);
           setStatus('DONE');
+          setToast({
+            type: 'success',
+            message: '✅ 분석이 완료되었습니다!'
+          });
           clearInterval(interval);
           return;
         }
@@ -59,6 +71,10 @@ export const Dashboard: React.FC = () => {
         if (jobStatus === 'FAILED') {
           console.log('❌ Analysis failed');
           setStatus('FAILED');
+          setToast({
+            type: 'error',
+            message: '❌ 분석 처리에 실패했습니다.'
+          });
           clearInterval(interval);
           return;
         }
@@ -67,11 +83,19 @@ export const Dashboard: React.FC = () => {
         if (jobStatus !== 'RUNNING') {
           console.warn('⚠️ Unexpected status:', jobStatus);
           setStatus('FAILED');
+          setToast({
+            type: 'error',
+            message: '예상치 못한 오류가 발생했습니다.'
+          });
           clearInterval(interval);
         }
       } catch (error) {
         console.error('🚨 Error during polling:', error);
         setStatus('FAILED');
+        setToast({
+          type: 'error',
+          message: '분석 상태 확인 중 오류가 발생했습니다.'
+        });
         clearInterval(interval);
       }
     }, 3000);
@@ -100,15 +124,23 @@ export const Dashboard: React.FC = () => {
     try {
       console.log('🚀 Starting analysis...');
       setStatus('RUNNING');
-      setLoading(false); // 중복 호출 방지
 
       const { analysisId } = await analysisAPI.startAnalysis();
       console.log('📋 Analysis started with ID:', analysisId);
       setAnalysisId(analysisId);
+      
+      // 토스트 메시지 표시 (대기 상태는 표시하지 않음)
+      setToast({
+        type: 'info',
+        message: '분석 요청이 완료되었습니다. 잠시만 기다려주세요...'
+      });
     } catch (error) {
       console.error('🚨 Failed to start analysis:', error);
-      setStatus('FAILED');
-      setLoading(false);
+      setStatus('IDLE');
+      setToast({
+        type: 'error',
+        message: '분석 요청에 실패했습니다. 다시 시도해주세요.'
+      });
     }
   };
 
@@ -140,46 +172,66 @@ export const Dashboard: React.FC = () => {
     link.click();
   };
 
-  if (status === 'RUNNING') {
-    console.log('⏳ Rendering loading spinner, status:', status);
-    return <LoadingSpinner message="분석 작업을 실행 중입니다..." />;
-  }
-
-  if (status === 'FAILED') {
-    console.log('❌ Rendering error state');
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
-            <h2 className="text-2xl font-bold text-red-800 mb-4">
-              🚨 분석 작업에 실패했습니다
-            </h2>
-            <p className="text-red-600 mb-6">
-              서버 응답이 없거나 에러가 발생했습니다. 브라우저 개발자 도구(F12)의 콘솔을 확인해보세요.
-            </p>
-            <div className="space-x-4">
-              <button
-                onClick={() => setStatus('IDLE')}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-              >
-                🔄 다시 시도
-              </button>
-              <button
-                onClick={loadLatestAnalysis}
-                className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-              >
-                📊 기존 결과 보기
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 토스트 자동 제거
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast, status]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
       <div className="max-w-7xl mx-auto">
+        {/* 토스트 메시지 모달 */}
+        {toast && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div
+              className={`bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all ${
+                toast.type === 'success'
+                  ? 'border-t-4 border-green-500'
+                  : toast.type === 'error'
+                  ? 'border-t-4 border-red-500'
+                  : 'border-t-4 border-blue-500'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center">
+                {toast.type === 'success' && (
+                  <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
+                )}
+                {toast.type === 'error' && (
+                  <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
+                )}
+                {toast.type === 'info' && (
+                  <Hourglass className="h-16 w-16 text-blue-500 mb-4" />
+                )}
+                <p className="text-lg font-semibold text-gray-800 mb-2">
+                  {toast.message}
+                </p>
+                {toast.type === 'info' && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    분석이 완료되면 자동으로 결과가 업데이트됩니다.
+                  </p>
+                )}
+                <button
+                  onClick={() => setToast(null)}
+                  className={`px-6 py-2 rounded-lg font-semibold text-white transition-colors ${
+                    toast.type === 'success'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : toast.type === 'error'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 헤더 */}
         <AnalysisHeader
           onRunAnalysis={handleRunAnalysis}
