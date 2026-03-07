@@ -4,7 +4,6 @@ import ReactMarkdown from 'react-markdown';
 import { AnalysisHeader } from './AnalysisHeader';
 import { StockCard } from './StockCard';
 import { ChartComponent } from './ChartComponent';
-import { LoadingSpinner } from './LoadingSpinner';
 import { analysisAPI } from '../services/api';
 import type { LLMAnalysisResult, DailyPrice } from '../types';
 
@@ -19,8 +18,7 @@ export const Dashboard: React.FC = () => {
   const [analyses, setAnalyses] = useState<LLMAnalysisResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<LLMAnalysisResult | null>(null);
-  const [dailyPrices, setDailyPrices] = useState<DailyPrice[]>([]);
-
+  const [dailyPrices, setDailyPrices] = useState<DailyPrice[]>([]);   
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>('IDLE');
   const [toast, setToast] = useState<ToastMessage | null>(null);
