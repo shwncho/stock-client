@@ -1,3 +1,5 @@
+export type StockTarget = 'DOMESTIC' | 'OVERSEAS';
+
 export interface DailyPrice {
   stockCode: string;
   tradeDate: string;
@@ -22,16 +24,18 @@ export interface StockData {
 }
 
 export interface LLMAnalysisResult {
-  id: number;
+  id?: number;
+  target?: StockTarget;
   stockCode: string;
   stockName: string;
   analysisDate: string;
   llmAnalysis: string;
   recommendation: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface AnalysisResponse {
+  target?: StockTarget;
   stockCode: string;
   stockName: string;
   currentPrice: number;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap } from 'lucide-react';
+import { Globe2, Landmark, Zap } from 'lucide-react';
 import type { LLMAnalysisResult } from '../types';
 
 interface StockCardProps {
@@ -8,8 +8,7 @@ interface StockCardProps {
 }
 
 export const StockCard: React.FC<StockCardProps> = ({ analysis, onExpand }) => {
-  const isPositive = analysis.recommendation === 'BUY';
-  const isNegative = analysis.recommendation === 'SELL';
+  const isOverseas = analysis.target === 'OVERSEAS';
 
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
@@ -40,10 +39,26 @@ export const StockCard: React.FC<StockCardProps> = ({ analysis, onExpand }) => {
   return (
     <div
       onClick={() => onExpand(analysis)}
-      className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow cursor-pointer p-6 border-l-4 border-blue-500"
+      className={`bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow cursor-pointer p-6 border-l-4 ${
+        isOverseas ? 'border-indigo-500' : 'border-blue-500'
+      }`}
     >
       <div className="flex justify-between items-start mb-4">
         <div>
+          <div
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold mb-2 ${
+              isOverseas
+                ? 'bg-indigo-50 text-indigo-700'
+                : 'bg-blue-50 text-blue-700'
+            }`}
+          >
+            {isOverseas ? (
+              <Globe2 className="h-3.5 w-3.5" />
+            ) : (
+              <Landmark className="h-3.5 w-3.5" />
+            )}
+            {isOverseas ? '해외주식' : '국내주식'}
+          </div>
           <h3 className="text-2xl font-bold text-gray-800">
             {analysis.stockName}
           </h3>

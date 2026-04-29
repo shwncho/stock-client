@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Globe2, Landmark } from 'lucide-react';
 import { ChartComponent } from '../components/ChartComponent';
 import { analysisAPI } from '../services/api';
 import { LLMAnalysisResult, DailyPrice } from '../types';
@@ -79,6 +79,8 @@ export const AnalysisPage: React.FC = () => {
     }
   };
 
+  const isOverseas = analysis.target === 'OVERSEAS';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* 헤더 */}
@@ -92,6 +94,16 @@ export const AnalysisPage: React.FC = () => {
               <ArrowLeft className="h-6 w-6" />
             </a>
             <div>
+              <div className="flex items-center gap-2 mb-2">
+                {isOverseas ? (
+                  <Globe2 className="h-5 w-5 text-indigo-200" />
+                ) : (
+                  <Landmark className="h-5 w-5 text-blue-200" />
+                )}
+                <span className="text-sm font-semibold text-gray-200">
+                  {isOverseas ? '해외주식' : '국내주식'}
+                </span>
+              </div>
               <h1 className="text-3xl font-bold">{analysis.stockName}</h1>
               <p className="text-gray-300">{analysis.stockCode}</p>
             </div>
@@ -111,7 +123,13 @@ export const AnalysisPage: React.FC = () => {
         {/* 분석 정보 */}
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">분석 정보</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className={isOverseas ? 'bg-indigo-50 p-4 rounded-lg' : 'bg-blue-50 p-4 rounded-lg'}>
+              <p className="text-gray-600 text-sm">시장 구분</p>
+              <p className={isOverseas ? 'text-2xl font-bold text-indigo-600' : 'text-2xl font-bold text-blue-600'}>
+                {isOverseas ? '해외주식' : '국내주식'}
+              </p>
+            </div>
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-gray-600 text-sm">종목 코드</p>
               <p className="text-2xl font-bold text-blue-600">{analysis.stockCode}</p>
@@ -131,7 +149,9 @@ export const AnalysisPage: React.FC = () => {
             <div className="bg-orange-50 p-4 rounded-lg">
               <p className="text-gray-600 text-sm">생성 날짜</p>
               <p className="text-lg font-bold text-orange-600">
-                {new Date(analysis.createdAt).toLocaleDateString('ko-KR')}
+                {analysis.createdAt
+                  ? new Date(analysis.createdAt).toLocaleDateString('ko-KR')
+                  : '-'}
               </p>
             </div>
           </div>
@@ -169,7 +189,9 @@ export const AnalysisPage: React.FC = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">분석 종목</span>
-              <span className="font-bold text-gray-800">거래량 Top 10</span>
+              <span className="font-bold text-gray-800">
+                {isOverseas ? '해외주식 거래량 Top 10' : '국내주식 거래량 Top 10'}
+              </span>
             </div>
           </div>
         </div>

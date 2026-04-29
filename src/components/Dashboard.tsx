@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, CheckCircle, AlertCircle, Hourglass } from 'lucide-react';
+import {
+  X,
+  Download,
+  CheckCircle,
+  AlertCircle,
+  Hourglass,
+  Globe2,
+  Landmark,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { AnalysisHeader } from './AnalysisHeader';
 import { StockCard } from './StockCard';
@@ -22,6 +30,28 @@ export const Dashboard: React.FC = () => {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>('IDLE');
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const domesticAnalyses = analyses.filter((analysis) => analysis.target !== 'OVERSEAS');
+  const overseasAnalyses = analyses.filter((analysis) => analysis.target === 'OVERSEAS');
+  const analysisSections = [
+    {
+      key: 'DOMESTIC',
+      title: '국내주식',
+      description: '국내 시장 거래량 상위 종목 분석',
+      analyses: domesticAnalyses,
+      icon: Landmark,
+      accentClassName: 'text-blue-600',
+      countClassName: 'bg-blue-50 text-blue-700',
+    },
+    {
+      key: 'OVERSEAS',
+      title: '해외주식',
+      description: '해외 시장 거래량 상위 종목 분석',
+      analyses: overseasAnalyses,
+      icon: Globe2,
+      accentClassName: 'text-indigo-600',
+      countClassName: 'bg-indigo-50 text-indigo-700',
+    },
+  ].filter((section) => section.analyses.length > 0);
 
   // 상태 변화 추적
   useEffect(() => {
@@ -154,6 +184,7 @@ export const Dashboard: React.FC = () => {
       analysisDate: new Date().toLocaleString('ko-KR'),
       totalStocks: analyses.length,
       analyses: analyses.map((a) => ({
+        구분: a.target === 'OVERSEAS' ? '해외주식' : '국내주식',
         종목명: a.stockName,
         종목코드: a.stockCode,
         추천: a.recommendation,
@@ -254,14 +285,42 @@ export const Dashboard: React.FC = () => {
         {analyses.length > 0 ? (
           <>
             {/* 종목 카드 그리드 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {analyses.map((analysis) => (
-                <StockCard
-                  key={analysis.stockCode}
-                  analysis={analysis}
-                  onExpand={handleExpandCard}
-                />
-              ))}
+            <div className="space-y-10 mb-8">
+              {analysisSections.map((section) => {
+                const SectionIcon = section.icon;
+
+                return (
+                  <section key={section.key}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <SectionIcon className={`h-6 w-6 ${section.accentClassName}`} />
+                        <div>
+                          <h2 className="text-2xl font-bold text-gray-900">
+                            {section.title}
+                          </h2>
+                          <p className="text-sm text-gray-500">
+                            {section.description}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-md text-sm font-bold ${section.countClassName}`}
+                      >
+                        {section.analyses.length}개
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {section.analyses.map((analysis) => (
+                        <StockCard
+                          key={`${analysis.target ?? 'DOMESTIC'}-${analysis.stockCode}`}
+                          analysis={analysis}
+                          onExpand={handleExpandCard}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
 
             {/* 상세 분석 모달 */}
@@ -269,9 +328,21 @@ export const Dashboard: React.FC = () => {
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
                   <div className="sticky top-0 bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 flex justify-between items-center">
-                    <h2 className="text-3xl font-bold">
-                      {selectedAnalysis.stockName} ({selectedAnalysis.stockCode})
-                    </h2>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        {selectedAnalysis.target === 'OVERSEAS' ? (
+                          <Globe2 className="h-5 w-5 text-indigo-200" />
+                        ) : (
+                          <Landmark className="h-5 w-5 text-blue-200" />
+                        )}
+                        <span className="text-sm font-semibold text-gray-200">
+                          {selectedAnalysis.target === 'OVERSEAS' ? '해외주식' : '국내주식'}
+                        </span>
+                      </div>
+                      <h2 className="text-3xl font-bold">
+                        {selectedAnalysis.stockName} ({selectedAnalysis.stockCode})
+                      </h2>
+                    </div>
                     <button
                       onClick={() => setSelectedAnalysis(null)}
                       className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
@@ -340,8 +411,11 @@ export const Dashboard: React.FC = () => {
 
                     {/* 분석 정보 */}
                     <div className="text-sm text-gray-500 border-t pt-6">
+                      <p>구분: {selectedAnalysis.target === 'OVERSEAS' ? '해외주식' : '국내주식'}</p>
                       <p>분석일: {new Date(selectedAnalysis.analysisDate).toLocaleString('ko-KR')}</p>
-                      <p>생성일: {new Date(selectedAnalysis.createdAt).toLocaleString('ko-KR')}</p>
+                      {selectedAnalysis.createdAt && (
+                        <p>생성일: {new Date(selectedAnalysis.createdAt).toLocaleString('ko-KR')}</p>
+                      )}
                     </div>
                   </div>
                 </div>
