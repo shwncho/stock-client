@@ -22,13 +22,46 @@ interface ToastMessage {
   message: string;
 }
 
+const ANALYSIS_RESULTS_STORAGE_KEY = 'stock-analysis-dashboard:analysis-results';
+const ANALYSIS_ID_STORAGE_KEY = 'stock-analysis-dashboard:analysis-id';
+
+const readStoredAnalyses = (): LLMAnalysisResult[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const storedAnalyses = window.sessionStorage.getItem(ANALYSIS_RESULTS_STORAGE_KEY);
+    const parsedAnalyses = storedAnalyses ? JSON.parse(storedAnalyses) : [];
+
+    return Array.isArray(parsedAnalyses) ? parsedAnalyses : [];
+  } catch (error) {
+    console.error('🚨 저장된 분석 결과 복원 실패:', error);
+    window.sessionStorage.removeItem(ANALYSIS_RESULTS_STORAGE_KEY);
+    return [];
+  }
+};
+
+const readStoredAnalysisId = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.sessionStorage.getItem(ANALYSIS_ID_STORAGE_KEY);
+};
+
 export const Dashboard: React.FC = () => {
-  const [analyses, setAnalyses] = useState<LLMAnalysisResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [analyses, setAnalyses] = useState<LLMAnalysisResult[]>(readStoredAnalyses);
   const [selectedAnalysis, setSelectedAnalysis] = useState<LLMAnalysisResult | null>(null);
   const [dailyPrices, setDailyPrices] = useState<DailyPrice[]>([]);   
-  const [analysisId, setAnalysisId] = useState<string | null>(null);
-  const [status, setStatus] = useState<AnalysisStatus>('IDLE');
+  const [analysisId, setAnalysisId] = useState<string | null>(readStoredAnalysisId);
+  const [status, setStatus] = useState<AnalysisStatus>(() => {
+    if (readStoredAnalysisId()) {
+      return 'RUNNING';
+    }
+
+    return readStoredAnalyses().length > 0 ? 'DONE' : 'IDLE';
+  });
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const domesticAnalyses = analyses.filter((analysis) => analysis.target !== 'OVERSEAS');
   const overseasAnalyses = analyses.filter((analysis) => analysis.target === 'OVERSEAS');
@@ -59,15 +92,9 @@ export const Dashboard: React.FC = () => {
       status,
       analysisId,
       analysesCount: analyses.length,
-      loading,
       hasSelectedAnalysis: !!selectedAnalysis
     });
-  }, [status, analysisId, analyses.length, loading, selectedAnalysis]);
-
-  //초기 로드
-  useEffect(() => {
-    loadLatestAnalysis();
-  }, []);
+  }, [status, analysisId, analyses.length, selectedAnalysis]);
 
   useEffect(() => {
     if (!analysisId || status !== 'RUNNING') {
@@ -87,6 +114,12 @@ export const Dashboard: React.FC = () => {
           console.log('✅ Analysis completed');
           const results = await analysisAPI.getResult(analysisId);
           setAnalyses(results);
+          window.sessionStorage.setItem(
+            ANALYSIS_RESULTS_STORAGE_KEY,
+            JSON.stringify(results)
+          );
+          window.sessionStorage.removeItem(ANALYSIS_ID_STORAGE_KEY);
+          setAnalysisId(null);
           setStatus('DONE');
           setToast({
             type: 'success',
@@ -98,6 +131,8 @@ export const Dashboard: React.FC = () => {
 
         if (jobStatus === 'FAILED') {
           console.log('❌ Analysis failed');
+          window.sessionStorage.removeItem(ANALYSIS_ID_STORAGE_KEY);
+          setAnalysisId(null);
           setStatus('FAILED');
           setToast({
             type: 'error',
@@ -110,6 +145,8 @@ export const Dashboard: React.FC = () => {
         // 예상치 못한 상태 값 처리
         if (jobStatus !== 'RUNNING') {
           console.warn('⚠️ Unexpected status:', jobStatus);
+          window.sessionStorage.removeItem(ANALYSIS_ID_STORAGE_KEY);
+          setAnalysisId(null);
           setStatus('FAILED');
           setToast({
             type: 'error',
@@ -119,6 +156,8 @@ export const Dashboard: React.FC = () => {
         }
       } catch (error) {
         console.error('🚨 Error during polling:', error);
+        window.sessionStorage.removeItem(ANALYSIS_ID_STORAGE_KEY);
+        setAnalysisId(null);
         setStatus('FAILED');
         setToast({
           type: 'error',
@@ -134,28 +173,21 @@ export const Dashboard: React.FC = () => {
     };
   }, [analysisId, status]);
 
-  const loadLatestAnalysis = async () => {
-    try {
-      setLoading(true);
-      console.log('📥 Loading latest analysis...');
-      const results = await analysisAPI.getLatestAnalysis();
-      console.log('📊 Latest analysis loaded:', results.length, 'items');
-      setAnalyses(results);
-    } catch (error) {
-      console.error('🚨 분석 결과 로드 실패:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRunAnalysis = async () => {
     try {
       console.log('🚀 Starting analysis...');
+      setAnalyses([]);
+      setSelectedAnalysis(null);
+      setDailyPrices([]);
+      setAnalysisId(null);
+      window.sessionStorage.removeItem(ANALYSIS_RESULTS_STORAGE_KEY);
+      window.sessionStorage.removeItem(ANALYSIS_ID_STORAGE_KEY);
       setStatus('RUNNING');
 
       const { analysisId } = await analysisAPI.startAnalysis();
       console.log('📋 Analysis started with ID:', analysisId);
       setAnalysisId(analysisId);
+      window.sessionStorage.setItem(ANALYSIS_ID_STORAGE_KEY, analysisId);
       
       // 토스트 메시지 표시 (대기 상태는 표시하지 않음)
       setToast({
@@ -264,7 +296,7 @@ export const Dashboard: React.FC = () => {
         {/* 헤더 */}
         <AnalysisHeader
           onRunAnalysis={handleRunAnalysis}
-          isLoading={loading}
+          isLoading={status === 'RUNNING'}
           analysisDate={analyses[0]?.analysisDate}
         />
 
@@ -422,6 +454,14 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
           </>
+        ) : status === 'RUNNING' ? (
+          <div className="text-center py-12">
+            <Hourglass className="h-10 w-10 text-blue-500 mx-auto mb-4 animate-pulse" />
+            <p className="text-gray-700 text-lg font-semibold">분석을 진행 중입니다.</p>
+            <p className="text-gray-400 text-sm mt-2">
+              결과를 받으면 자동으로 화면에 표시됩니다.
+            </p>
+          </div>
         ) : (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">분석 결과가 없습니다.</p>
